@@ -1,7 +1,9 @@
 # 4d4y Markdown Enhancer  
 
 ## 介绍  
-这是一个 **Tampermonkey** 脚本，适用于 **4d4y 论坛**，可自动将论坛帖子中的 **Markdown 语法** 转换为 **HTML**，优化阅读体验。  
+这是一个 **Tampermonkey** 脚本，适用于 **4d4y 论坛**，可自动将论坛帖子中的 **Markdown 语法** 转换为 **HTML**，优化阅读体验。
+
+最早发布于[Greasyfork](https://greasyfork.org/zh-CN/scripts/526144-4d4y-markdown-enhancer)，可点击直接安装。
 
 ## 功能  
 - 自动检测并转换帖子中的 Markdown 语法，如 `# 标题`、`**加粗**`、`*斜体*`、`代码块` 等。  
