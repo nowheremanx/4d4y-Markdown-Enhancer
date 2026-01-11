@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         4d4y Markdown Enhancer
 // @namespace    http://tampermonkey.net/
-// @version      2.6
+// @version      2.7
 // @description  Convert potential Markdown syntax into HTML in 4d4y forum posts without removing existing HTML elements. Toggle original text with Ctrl+M, with a mode switch notification.
 // @match        https://www.4d4y.com/forum/*
 // @author       屋大维 + ChatGPT
@@ -44,6 +44,114 @@
                 .replace(/&/g, "&amp;")
                 .replace(/</g, "&lt;")
                 .replace(/>/g, "&gt;");
+        }
+
+        function highlightWithPatterns(code, patterns) {
+            let result = "";
+            let index = 0;
+
+            while (index < code.length) {
+                let next = null;
+                for (let i = 0; i < patterns.length; i++) {
+                    let pattern = patterns[i];
+                    pattern.regex.lastIndex = index;
+                    let match = pattern.regex.exec(code);
+                    if (match && (!next || match.index < next.index)) {
+                        next = { match, style: pattern.style };
+                    }
+                }
+
+                if (!next) {
+                    result += code.slice(index);
+                    break;
+                }
+
+                if (next.match.index > index) {
+                    result += code.slice(index, next.match.index);
+                }
+
+                result += `<span style="${next.style}">${next.match[0]}</span>`;
+                index = next.match.index + next.match[0].length;
+            }
+
+            return result;
+        }
+
+        function highlightCode(code, lang) {
+            let escaped = escapeHtml(code);
+            let language = (lang || "").toLowerCase();
+
+            let styles = {
+                comment: "color: #7f848e;",
+                string: "color: #c3e88d;",
+                number: "color: #f78c6c;",
+                keyword: "color: #82aaff; font-weight: 600;",
+                literal: "color: #ffcb6b;",
+                tag: "color: #ff6363;",
+                attr: "color: #c792ea;",
+                prop: "color: #82aaff;",
+            };
+
+            let jsPatterns = [
+                { regex: /\/\/[^\n]*|\/\*[\s\S]*?\*\//g, style: styles.comment },
+                { regex: /"(?:\\.|[^"\\])*"|'(?:\\.|[^'\\])*'|`(?:\\.|[^`\\])*`/g, style: styles.string },
+                { regex: /\b\d+(?:\.\d+)?\b/g, style: styles.number },
+                { regex: /\b(?:true|false|null|undefined)\b/g, style: styles.literal },
+                {
+                    regex: /\b(?:const|let|var|function|return|if|else|for|while|switch|case|break|continue|try|catch|finally|throw|new|class|extends|import|from|export|default|async|await|typeof|instanceof)\b/g,
+                    style: styles.keyword,
+                },
+            ];
+
+            let jsonPatterns = [
+                { regex: /"(?:\\.|[^"\\])*"/g, style: styles.string },
+                { regex: /\b\d+(?:\.\d+)?\b/g, style: styles.number },
+                { regex: /\b(?:true|false|null)\b/g, style: styles.literal },
+            ];
+
+            let bashPatterns = [
+                { regex: /#[^\n]*/g, style: styles.comment },
+                { regex: /"(?:\\.|[^"\\])*"|'(?:\\.|[^'\\])*'/g, style: styles.string },
+                { regex: /\b\d+(?:\.\d+)?\b/g, style: styles.number },
+                { regex: /\b(?:cd|ls|pwd|cat|echo|grep|rg|find|awk|sed|curl|wget|git|npm|yarn|pnpm|python|node|bash|zsh|ssh)\b/g, style: styles.keyword },
+            ];
+
+            let htmlPatterns = [
+                { regex: /&lt;\/?[^\s&]+(?:\s+[^&]*?)?&gt;/g, style: styles.tag },
+                { regex: /\b[a-zA-Z-]+(?==)/g, style: styles.attr },
+                { regex: /"(?:\\.|[^"\\])*"/g, style: styles.string },
+            ];
+
+            let cssPatterns = [
+                { regex: /\/\*[\s\S]*?\*\//g, style: styles.comment },
+                { regex: /"(?:\\.|[^"\\])*"|'(?:\\.|[^'\\])*'/g, style: styles.string },
+                { regex: /\b\d+(?:\.\d+)?(px|em|rem|vh|vw|%)?\b/g, style: styles.number },
+                { regex: /\b[a-z-]+(?=\s*:)/g, style: styles.prop },
+            ];
+
+            let genericPatterns = [
+                { regex: /\/\/[^\n]*|\/\*[\s\S]*?\*\//g, style: styles.comment },
+                { regex: /"(?:\\.|[^"\\])*"|'(?:\\.|[^'\\])*'|`(?:\\.|[^`\\])*`/g, style: styles.string },
+                { regex: /\b\d+(?:\.\d+)?\b/g, style: styles.number },
+            ];
+
+            if (["js", "javascript", "ts", "tsx", "jsx"].includes(language)) {
+                return highlightWithPatterns(escaped, jsPatterns);
+            }
+            if (["json"].includes(language)) {
+                return highlightWithPatterns(escaped, jsonPatterns);
+            }
+            if (["bash", "sh", "shell", "zsh"].includes(language)) {
+                return highlightWithPatterns(escaped, bashPatterns);
+            }
+            if (["html", "xml"].includes(language)) {
+                return highlightWithPatterns(escaped, htmlPatterns);
+            }
+            if (["css"].includes(language)) {
+                return highlightWithPatterns(escaped, cssPatterns);
+            }
+
+            return highlightWithPatterns(escaped, genericPatterns);
         }
 
         // **1. 处理带语言标签的代码块**
@@ -103,7 +211,7 @@
                       font-size: 14px;
                       line-height: 1.5;
                       margin: 0;
-                  "><code>${escapeHtml(cleanCode)}</code></pre>
+                  "><code>${highlightCode(cleanCode, lang)}</code></pre>
               </div>`);
             },
         );
@@ -147,7 +255,7 @@
                   font-size: 14px;
                   line-height: 1.5;
                   margin: 0;
-              "><code>${escapeHtml(cleanCode)}</code></pre>
+              "><code>${highlightCode(cleanCode)}</code></pre>
           </div>`);
         });
 
